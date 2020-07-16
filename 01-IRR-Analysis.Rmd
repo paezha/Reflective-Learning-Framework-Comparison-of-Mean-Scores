@@ -1,0 +1,1236 @@
+---
+title: "Intra-rater reliability analysis - KW"
+output: html_notebook
+---
+
+Data for analysis of inter-rater reliability and student performance was prepared in file `00-Data-Preprocessing`.
+
+In this notebook, we complete the analysis of inter-rater reliability.
+
+First, load packages:
+```{r message=FALSE}
+library(tidyverse)
+library(irr)
+```
+
+Read data file:
+```{r}
+load("reflection_ratings.RData") 
+```
+
+The rows are reflections labelled with the code for the subject and the course. See:
+```{r}
+head(reflection_ratings)
+```
+
+In the table above, `3S 1` is reflection 1 in course 3S.
+
+The columns are the items that are being rated, which are grouped in the following categories:
+
+Category | Code
+-|-
+TP | Temporal Progression
+IA | Important Aspects of the Experience
+AT | connection to Academic Theory
+ROC | Relating to Other Contexts
+TF | Personal Thoughts and Feelings
+CE | Cause-and-Effect Relationships
+OR | Other Possible Responses
+P | Planning and Future Practices
+
+Furthermore, there is a Total_Score for each reflection, a Course with the code of the course (`3S03` and `MP`), and a code for the rater (`R`, `M`, `K`). Each rater independently rated each reflection.
+
+Summary of TP_recall:
+```{r}
+summary(reflection_ratings$TP_recall)
+```
+
+Summary of TP_organize:
+```{r}
+summary(reflection_ratings$TP_organize)
+```
+
+Example: lets say that you want to assess the agreement for item TP_recall in 3S. We need to extract that item from the dataframe:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_recall, Course, Rater) %>%
+  filter(Course == "3S03") %>%
+  spread(Rater, TP_recall) %>%
+  select(R, M, K) %>%
+  agree()
+```
+
+Calculate the ICC for TP_recall. Notice that we need to decide the model, type, and unit. Check this for an explanation of these terms (https://www.datanovia.com/en/lessons/intraclass-correlation-coefficient-in-r/):
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_recall, Course, Rater) %>%
+  filter(Course == "3S03") %>%
+  spread(Rater, TP_recall) %>%
+  select(R, M, K) %>%
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("single"))
+```
+
+#Example: lets say that you want to assess the agreement for item TP_organize in 3S. We need to extract that item from the dataframe:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_organize, Course, Rater) %>%
+  filter(Course == "3S03") %>%
+  spread(Rater, TP_organize) %>%
+  select(R, M, K) %>%
+  agree()
+```
+
+Calculate the ICC for TP_organize. Notice that we need to decide the model, type, and unit:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_organize, Course, Rater) %>%
+  filter(Course == "3S03") %>%
+  spread(Rater, TP_organize) %>%
+  select(R, M, K) %>%
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("single"))
+```
+
+Example: lets say that you want to assess the agreement for item ROC_differentiate in 3S. We need to extract that item from the dataframe before passing it to the `agree()` function:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_differentiate) %>%
+  select(R, M, K) %>%
+  agree()
+```
+
+Calculate the ICC for ROC_differentiate. Notice that we need to decide the model, type, and unit:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_differentiate) %>%
+  select(R, M, K) %>%  
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("single"))
+```
+
+Above, the `icc` gave a higher value than using `agree` for ROC_differentiate
+
+There is also another measure called Krippendorff's alpha (see here:https://en.wikipedia.org/wiki/Krippendorff%27s_alpha):
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_differentiate, Course, Rater) %>%
+    #filter(Course == "3S03") %>%
+  spread(Rater, ROC_differentiate) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Using `kripp.alpha` produces results similar to `icc` for ROC_differentiate.
+
+Calculate alpha for total score (this is what matters in the end from the perspective of grading):
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, `Total_Score`, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, `Total_Score`) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Calculate alpha for P_generate:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, P_generate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, P_generate) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Calculate alpha for P_plan:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, P_plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, P_plan) %>%
+  select(R, M) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+# Calculating irr using `kripp.alpha`
+
+## Will aggregate by each reflection category, to enable irr calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+
+## Aggregating by high and lower order cognitive skill categories and total using `kiripp.alpha`.
+
+Aggregate by Recount:
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Aggregate by Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+Calculate by Total_Score
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  as.matrix() %>%
+  t() %>%
+  kripp.alpha("ordinal")
+```
+
+#Calculating using `agree`
+
+##Will aggregate by each reflection category, to enable irr calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+#Aggregating by Recount, Discussion, and Total_Score
+
+## Aggregating by high and lower order cognitive skill categories and total using `agree`.
+
+Aggregate by Recount:
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Aggregate by Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+Calculate by Total_Score
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  agree()
+```
+
+#Calculating irr using `icc` with average
+
+##Will aggregate by each reflection category, to enable `icc` calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+
+#Aggregating by Recount, Discussion, and Total_Score
+
+## Aggregating by high and lower order cognitive skill categories and total using `icc`.
+
+Aggregate by Recount usin 'irr'
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+Aggregate by category Total_Score:
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("agreement"),
+      unit = c("average"))
+```
+
+#Calculating irr using `icc` with average and consistency
+
+##Will aggregate by each reflection category, to enable `icc` calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+
+#Aggregating by Recount, Discussion, and Total_Score
+
+## Aggregating by high and lower order cognitive skill categories and total using `icc`.
+
+Aggregate by Recount usin 'irr'
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+Aggregate by category Total_Score:
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("single"))
+```
+
+# Calculating irr using `icc` with average and consistency
+
+## Will aggregate by each reflection category, to enable `icc` calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+ icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+
+#Aggregating by Recount, Discussion, and Total_Score
+
+## Aggregating by high and lower order cognitive skill categories and total using `icc`.
+
+Aggregate by Recount usin 'irr'
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+Aggregate by category Total_Score:
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  icc(model = c("twoway"),
+      type = c("consistency"),
+      unit = c("average"))
+```
+
+# Use package `psych`
+
+Load package:
+```{r}
+library(psych)
+library(ggplot2)
+library(lme4)
+```
+
+Calculate icc with `ICC()` function:
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_differentiate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+The icc values appear to be higher for `ICC` in `psych` than the previous `irr`
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_recall, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, TP_recall) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TP_organize, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, TP_organize) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, IA_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, IA_differentiate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, IA_summarize, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, IA_summarize) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, AT_compare, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, AT_compare) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, AT_infer, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, AT_infer) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_compare, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_compare) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_differentiate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, ROC_compare, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, ROC_compare) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TF_attribute, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, TF_attribute) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, TF_organize, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, TF_organize) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, CE_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, CE_differentiate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, CE_explain, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, CE_explain) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, CE_critique, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, CE_critique) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, OR_differentiate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, OR_differentiate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, OR_generate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, OR_generate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, OR_critique, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, OR_critique) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, P_generate, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, P_generate) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, P_plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, P_plan) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+```{r}
+reflection_ratings %>% 
+  select(`Subject_code`, P_check, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, P_check) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+
+#Calculating using `ICC`
+
+##Will aggregate by each reflection category, to enable irr calculations at the category level.
+
+Aggregate by category Temporal Progression 
+```{r}
+reflection_ratings %>% 
+  mutate(Temporal = TP_recall + TP_organize) %>%
+  select(`Subject_code`, Temporal, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Temporal) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Important Aspects
+```{r}
+reflection_ratings %>% 
+  mutate(Important = IA_differentiate + IA_summarize) %>%
+  select(`Subject_code`, Important, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Important) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Academic Theory
+```{r}
+reflection_ratings %>% 
+  mutate(Academic = AT_compare + AT_infer) %>%
+  select(`Subject_code`, Academic, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Academic) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Releating to Other Contexts
+```{r}
+reflection_ratings %>% 
+  mutate(Relating = ROC_compare + ROC_differentiate + ROC_example) %>%
+  select(`Subject_code`, Relating, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Relating) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Thoughts and Feelings
+```{r}
+reflection_ratings %>% 
+  mutate(Thoughts = TF_attribute + TF_organize + TF_summarize) %>%
+  select(`Subject_code`, Thoughts, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Thoughts) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Cause and Effect
+```{r}
+reflection_ratings %>% 
+  mutate(Cause = CE_differentiate + CE_explain + CE_critique) %>%
+  select(`Subject_code`, Cause, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Cause) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Other Possible Responses
+```{r}
+reflection_ratings %>% 
+  mutate(Other = OR_differentiate + OR_generate + OR_critique) %>%
+  select(`Subject_code`, Other, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Other) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by category Plan:
+```{r}
+reflection_ratings %>% 
+  mutate(Plan = P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Plan, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Plan) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+#Aggregating by Recount, Discussion, and Total_Score
+
+## Aggregating by high and lower order cognitive skill categories and total using `agree`.
+
+Aggregate by Recount:
+```{r}
+reflection_ratings %>% 
+  mutate(Recount = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer) %>%
+  select(`Subject_code`, Recount, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Recount) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Aggregate by Discussion:
+```{r}
+reflection_ratings %>% 
+  mutate(Discussion = ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Discussion, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Discussion) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+
+Calculate by Total_Score
+```{r}
+reflection_ratings %>% 
+  mutate(Total_Score = TP_recall + TP_organize + IA_differentiate + IA_summarize + AT_compare + AT_infer + ROC_compare + ROC_differentiate + ROC_example + TF_attribute + TF_organize + TF_summarize + CE_differentiate + CE_explain + CE_critique + OR_differentiate + OR_generate + OR_critique + P_generate + P_plan + P_check) %>%
+  select(`Subject_code`, Total_Score, Course, Rater) %>%
+  #filter(Course == "3S03") %>%
+  spread(Rater, Total_Score) %>%
+  select(R, M, K) %>% 
+  ICC()
+```
+

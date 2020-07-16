@@ -1,0 +1,128 @@
+---
+title: "00-Data-Preprocessing"
+output: html_notebook
+---
+
+In this research we examine two sets of reflections. The first set of reflections were written by students in YEAR before the Reflective Learning Framework (RLF) was developed, and the second were written by a different group of students in YEAR who were trained in the use of the RLF.
+
+The reflections were scored by three independent raters
+
+The research has two primary questions:
+
+1. Is the framework reliable when used by multiple raters? This is the first investigation into the inter-rater reliability of the framework. If we can establish the reliability of the framework, then we can ask the following question:
+
+2. Do students who are trained in the RLF demonstrate better performance in the writing of reflections?
+
+In this notebook, we prepare the data for analysis.
+
+Begin by loading the packages used:
+```{r message=FALSE}
+library(tidyverse)
+library(readxl)
+```
+
+There are three files with the scores. The raters are labelled `R`, `M`, and `K`. The two sets of reflections are labelled `MP` and `S`, with `MP` being the earliest set and `S` the more recent set. Our hypothesis is that the scores for `S` will be greater than the scores for `MP`.   
+
+Read data files:
+```{r message=FALSE}
+R_3S <- read_excel("IRR Template for R.xlsx", 
+    range = "A2:W26")
+R_MP <- read_excel("IRR Template for R.xlsx", 
+    range = "A28:W47",
+    col_names = FALSE)
+
+M_3S <- read_excel("IRR Template for M.xlsx", 
+    range = "A2:W26")
+M_MP <- read_excel("IRR Template for M.xlsx", 
+    range = "A28:W47",
+    col_names = FALSE)
+
+K_3S <- read_excel("IRR Template for K.xlsx", 
+    range = "A2:W26")
+K_MP <- read_excel("IRR Template for K.xlsx", 
+    range = "A28:W47",
+    col_names = FALSE)
+```
+
+The rows are reflections labelled with the code for the subject and then the scores for different items in the reflection rubric.
+
+Add a variable to the dataframes to indicate whether the reflection was from 3S03 or from MP:
+```{r}
+R_3S <- R_3S %>% mutate(REF = "3S03")
+R_MP <- R_MP %>% mutate(REF = "MP")
+
+M_3S <- M_3S %>% mutate(REF = "3S03")
+M_MP <- M_MP %>% mutate(REF = "MP")
+
+K_3S <- K_3S %>% mutate(REF = "3S03")
+K_MP <- K_MP %>% mutate(REF = "MP")
+```
+
+Set the names of the columns; each item is preceded by a code to indicate what is the category of the item. TP is Temporal Progression, IA is Important Aspects, and so on:
+```{r}
+colnames(R_3S) <- c("Subject_code",
+                    "TP_recall",
+                    "TP_organize",
+                    "IA_differentiate",
+                    "IA_summarize",
+                    "AT_compare",
+                    "AT_infer",
+                    "ROC_example",
+                    "ROC_differentiate",
+                    "ROC_compare",
+                    "TF_attribute",
+                    "TF_organize",
+                    "TF_summarize",
+                    "CE_differentiate",
+                    "CE_explain",
+                    "CE_critique",
+                    "OR_differentiate",
+                    "OR_generate",
+                    "OR_critique",
+                    "P_generate",
+                    "P_plan",
+                    "P_check",
+                    "Total_Score",
+                    "Course")
+colnames(R_MP) <- colnames(R_3S)
+colnames(M_3S) <- colnames(R_3S)
+colnames(M_MP) <- colnames(R_3S)
+colnames(K_3S) <- colnames(R_3S)
+colnames(K_MP) <- colnames(R_3S)
+```
+
+The codes for the categories of items are:
+
+Category | Code
+-|-
+TP | Temporal Progression
+IA | Important Aspects of the Experience
+AT | connection to Academic Theory
+ROC | Relating to Other Contexts
+TF | Personal Thoughts and Feelings
+CE | Cause-and-Effect Relationships
+OR | Other Possible Responses
+P | Planning and Future Practices
+
+Now, add a variable to indicate the rater:
+```{r}
+R_3S <- R_3S %>% mutate(Rater = "R")
+R_MP <- R_MP %>% mutate(Rater = "R")
+
+M_3S <- M_3S %>% mutate(Rater = "M")
+M_MP <- M_MP %>% mutate(Rater = "M")
+
+K_3S <- K_3S %>% mutate(Rater = "K")
+K_MP <- K_MP %>% mutate(Rater = "K")
+```
+
+Bind the dataframes for all :
+```{r}
+reflection_ratings <- rbind(R_3S, R_MP, M_3S, M_MP, K_3S, K_MP)
+```
+
+Save the data frame in RData form:
+```{r}
+save(reflection_ratings, file = "reflection_ratings.RData")
+```
+
